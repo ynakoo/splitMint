@@ -1,16 +1,26 @@
-# React + Vite
+# SplitMint Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Splitwise-like expense splitter frontend built with React + Vite.
 
-Currently, two official plugins are available:
+## Deployment on Vercel
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+To deploy this frontend to Vercel:
 
-## React Compiler
+1.  **Project Settings**:
+    *   **Build Command**: `npm run build`
+    *   **Output Directory**: `dist`
+    *   **Root Directory**: `frontend/` (if deploying from the root of the monorepo)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2.  **Environment Variables**:
+    *   Add `VITE_API_BASE` and set it to your backend API URL (e.g., `https://your-backend.render.com/api`).
 
-## Expanding the ESLint configuration
+3.  **Routing**:
+    *   The `vercel.json` file in the `frontend/` directory handles client-side routing automatically.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local Development
+
+1.  Navigate to the `frontend/` directory.
+2.  Install dependencies: `npm install`.
+3.  Create a `.env` file with `VITE_API_BASE=http://localhost:3001/api`.
+4.  Run the dev server: `npm run dev`.
+
