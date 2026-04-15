@@ -18,13 +18,17 @@ export default function SignupPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
     setError('');
     if (!username.trim()) {
       setError('Username is required');
+      if (btn) btn.disabled = false;
       return;
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
+      if (btn) btn.disabled = false;
       return;
     }
     setLoading(true);

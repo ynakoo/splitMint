@@ -4,8 +4,9 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { dashboardAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -14,8 +15,15 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    dashboardAPI.get()
-      .then(setData)
+    const token = localStorage.getItem('splitmint_token');
+    fetch(`${API_BASE}/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -82,7 +90,7 @@ export default function DashboardPage() {
                   <span>{g.expenseCount} expenses</span>
                 </div>
                 <div className="group-card-total">
-                  Total: <strong>${g.totalExpenses.toFixed(2)}</strong>
+                  Your Total Spent: <strong>${g.yourTotalSpent.toFixed(2)}</strong>
                 </div>
               </Link>
             ))}

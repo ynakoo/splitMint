@@ -4,7 +4,6 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { groupAPI } from '../services/api';
 
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
@@ -40,23 +39,36 @@ export default function CreateGroupPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
     setError('');
 
     if (!name.trim()) {
       setError('Group name is required');
+      if (btn) btn.disabled = false;
       return;
     }
 
     const validParticipants = participants.filter((p) => p.name.trim());
-    // Creator is added automatically by backend, so 0 additional is technically allowed
-    // but usually user wants to add someone.
 
     setLoading(true);
     try {
-      const group = await groupAPI.create({ name, participants: validParticipants });
-      navigate(`/groups/${group.id}`);
+      const token = localStorage.getItem('splitmint_token');
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/groups`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name, participants: validParticipants })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
+      navigate(`/groups/${data.id}`);
     } catch (err) {
       setError(err.message);
+      if (btn) btn.disabled = false;
     } finally {
       setLoading(false);
     }

@@ -4,7 +4,8 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { groupAPI } from '../services/api';
+
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
@@ -12,8 +13,15 @@ export default function GroupsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    groupAPI.list()
-      .then(setGroups)
+    const token = localStorage.getItem('splitmint_token');
+    fetch(`${API_BASE}/groups`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setGroups(d);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

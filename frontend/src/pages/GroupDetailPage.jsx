@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { groupAPI, expenseAPI, balanceAPI, participantAPI } from '../services/api';
 import AddExpenseModal from '../components/AddExpenseModal';
 import EditGroupModal from '../components/EditGroupModal';
 import { useAuth } from '../context/AuthContext';
@@ -34,9 +33,26 @@ export default function GroupDetailPage() {
   const [prefilledExpense, setPrefilledExpense] = useState(null);
   const [showEditGroup, setShowEditGroup] = useState(false);
 
+  const API_BASE = import.meta.env.VITE_API_BASE;
+
+  const authFetch = async (endpoint, options = {}) => {
+    const token = localStorage.getItem('splitmint_token');
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    return data;
+  };
+
   const loadGroup = useCallback(async () => {
     try {
-      const g = await groupAPI.get(id);
+      const g = await authFetch(`/groups/${id}`);
       setGroup(g);
     } catch (err) {
       setError(err.message);
@@ -45,10 +61,14 @@ export default function GroupDetailPage() {
 
   const loadExpenses = useCallback(async () => {
     try {
-      const e = await expenseAPI.list(id, {
+      const params = {
         search, participantId: filterParticipant,
         startDate: filterStartDate, endDate: filterEndDate,
-      });
+      };
+      const query = new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v))
+      ).toString();
+      const e = await authFetch(`/expenses/group/${id}${query ? `?${query}` : ''}`);
       setExpenses(e);
     } catch (err) {
       setError(err.message);
@@ -57,7 +77,7 @@ export default function GroupDetailPage() {
 
   const loadBalances = useCallback(async () => {
     try {
-      const result = await balanceAPI.settlements(id);
+      const result = await authFetch(`/balances/${id}/settlements`);
       setBalances(result.balances || []);
       setSettlements(result.settlements || []);
     } catch (err) {
@@ -76,72 +96,99 @@ export default function GroupDetailPage() {
   // Reload expenses when filters change
   useEffect(() => { if (!loading && tab === 'expenses') loadExpenses(); }, [search, filterParticipant, filterStartDate, filterEndDate, tab, loading, loadExpenses]);
 
-  const handleDeleteGroup = async () => {
-    if (!confirm('Delete this group and all its expenses? This cannot be undone.')) return;
+  const handleDeleteGroup = async (e) => {
+    e.target.disabled = true;
+    if (!confirm('Delete this group and all its expenses? This cannot be undone.')) { e.target.disabled = false; return; }
     try {
-      await groupAPI.delete(id);
+      await authFetch(`/groups/${id}`, { method: 'DELETE' });
       navigate('/groups');
     } catch (err) {
       setError(err.message);
+      e.target.disabled = false;
     }
   };
 
-  const handleDeleteExpense = async (expenseId) => {
-    if (!confirm('Delete this expense?')) return;
+  const handleDeleteExpense = async (expenseId, e) => {
+    e.target.disabled = true;
+    if (!confirm('Delete this expense?')) { e.target.disabled = false; return; }
     try {
-      await expenseAPI.delete(expenseId);
+      await authFetch(`/expenses/${expenseId}`, { method: 'DELETE' });
       loadAll();
     } catch (err) {
       setError(err.message);
+      e.target.disabled = false;
     }
   };
 
-  const handleAddParticipant = async () => {
+  const handleAddParticipant = async (e) => {
+    if (e?.target) e.target.disabled = true;
     const name = prompt('Participant name:');
-    if (!name) return;
+    if (!name) { if (e?.target) e.target.disabled = false; return; }
     try {
-      await participantAPI.add(id, { name });
+      await authFetch(`/participants/group/${id}`, { method: 'POST', body: JSON.stringify({ name }) });
       loadAll();
     } catch (err) {
       setError(err.message);
+      if (e?.target) e.target.disabled = false;
     }
   };
 
-  const handleRemoveParticipant = async (pid) => {
-    if (!confirm('Remove this participant?')) return;
+  const handleRemoveParticipant = async (pid, e) => {
+    e.target.disabled = true;
+    if (!confirm('Remove this participant?')) { e.target.disabled = false; return; }
     try {
-      await participantAPI.remove(pid);
+      await authFetch(`/participants/${pid}`, { method: 'DELETE' });
       loadAll();
     } catch (err) {
       setError(err.message);
+      e.target.disabled = false;
     }
   };
 
-  const handleInitiateSettlement = async (fromId, toId, amount) => {
-    if (!confirm('Initiate this settlement payment?')) return;
+  const handleInitiateSettlement = async (fromId, toId, amount, e) => {
+    e.target.disabled = true;
+    if (!confirm('Initiate this settlement payment?')) { e.target.disabled = false; return; }
     try {
-      await expenseAPI.create({
-        description: `Settlement Payment`,
-        amount: Math.abs(amount),
-        groupId: group.id,
-        payerId: fromId,
-        splitType: 'EQUAL',
-        participantIds: [toId],
-        isSettlement: true
+      await authFetch('/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          description: `Settlement Payment`,
+          amount: Math.abs(amount),
+          groupId: group.id,
+          payerId: fromId,
+          splitType: 'EQUAL',
+          participantIds: [toId],
+          isSettlement: true
+        })
       });
       loadAll();
     } catch (err) {
       setError(err.message);
+      e.target.disabled = false;
     }
   };
 
-  const handleConfirmSettlement = async (expenseId) => {
-    if (!confirm('Confirm you have received this payment?')) return;
+  const handleConfirmSettlement = async (expenseId, e) => {
+    e.target.disabled = true;
+    if (!confirm('Confirm you have received this payment?')) { e.target.disabled = false; return; }
     try {
-      await expenseAPI.confirmSettlement(expenseId);
+      await authFetch(`/expenses/${expenseId}/confirm`, { method: 'PUT' });
       loadAll();
     } catch (err) {
       setError(err.message);
+      e.target.disabled = false;
+    }
+  };
+
+  const handleRejectSettlement = async (expenseId, e) => {
+    e.target.disabled = true;
+    if (!confirm('Reject this settlement request?')) { e.target.disabled = false; return; }
+    try {
+      await authFetch(`/expenses/${expenseId}/reject`, { method: 'PUT' });
+      loadAll();
+    } catch (err) {
+      setError(err.message);
+      e.target.disabled = false;
     }
   };
 
@@ -174,7 +221,7 @@ export default function GroupDetailPage() {
             </>
           ) : (
             currentParticipant && (
-              <button className="btn btn-danger btn-sm" onClick={() => handleRemoveParticipant(currentParticipant.id)}>
+              <button className="btn btn-danger btn-sm" onClick={(e) => handleRemoveParticipant(currentParticipant.id, e)}>
                 Leave Group
               </button>
             )
@@ -222,8 +269,16 @@ export default function GroupDetailPage() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="filter-date" />
-            <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="filter-date" />
+            <div className="filter-date-range">
+              <div className="filter-date-wrapper">
+                <label>From</label>
+                <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="filter-date" />
+              </div>
+              <div className="filter-date-wrapper">
+                <label>To</label>
+                <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="filter-date" />
+              </div>
+            </div>
           </div>
 
           <button className="btn btn-primary" onClick={() => { setEditingExpense(null); setPrefilledExpense(null); setShowAddExpense(true); }}>
@@ -246,11 +301,14 @@ export default function GroupDetailPage() {
                       <span className="expense-desc">{exp.description}</span>
                       <span className="expense-meta">
                         Paid by <strong>{exp.payer.name}</strong> · {exp.splitType.toLowerCase()} split · {new Date(exp.date).toLocaleDateString()}
-                        {exp.isSettlement && !exp.isConfirmed && (
+                        {exp.isSettlement && !exp.isConfirmed && !exp.isRejected && (
                           <span className="ml-2 text-red font-semibold">(Pending Confirmation)</span>
                         )}
                         {exp.isSettlement && exp.isConfirmed && (
                           <span className="ml-2 text-green font-semibold">(Settled)</span>
+                        )}
+                        {exp.isSettlement && exp.isRejected && (
+                          <span className="ml-2 text-red font-semibold">(Rejected)</span>
                         )}
                       </span>
                       <div className="expense-splits">
@@ -265,17 +323,22 @@ export default function GroupDetailPage() {
                   <div className="expense-right">
                     <span className="expense-amount">${exp.amount.toFixed(2)}</span>
                     <div className="expense-actions flex flex-col gap-1 items-end mt-2">
-                      {exp.isSettlement && !exp.isConfirmed && (
-                        (isLeader || exp.splits.some(s => s.participant.userId === user?.id)) && (
-                          <button className="btn btn-primary btn-sm" onClick={() => handleConfirmSettlement(exp.id)}>
-                            Confirm Received
-                          </button>
+                      {exp.isSettlement && !exp.isConfirmed && !exp.isRejected && (
+                        (exp.splits.some(s => s.participant.userId === user?.id)) && (
+                          <div className="flex gap-2">
+                            <button className="btn btn-primary btn-sm" onClick={(e) => handleConfirmSettlement(exp.id, e)}>
+                              Confirm Received
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={(e) => handleRejectSettlement(exp.id, e)}>
+                              Reject
+                            </button>
+                          </div>
                         )
                       )}
                       {(isLeader || exp.payer.userId === user?.id) && (
                         <div className="flex gap-2 mt-1">
                           {!exp.isSettlement && <button className="btn btn-ghost btn-sm" onClick={() => { setEditingExpense(exp); setPrefilledExpense(null); setShowAddExpense(true); }}>Edit</button>}
-                          <button className="btn btn-ghost btn-sm text-red" onClick={() => handleDeleteExpense(exp.id)}>Delete</button>
+                          <button className="btn btn-ghost btn-sm text-red" onClick={(e) => handleDeleteExpense(exp.id, e)}>Delete</button>
                         </div>
                       )}
                     </div>
@@ -341,11 +404,22 @@ export default function GroupDetailPage() {
                     </span>
                     <span>{s.to.name}</span>
                   </div>
-                  {(isLeader || s.from.userId === user?.id) && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleInitiateSettlement(s.from.id, s.to.id, s.amount)}>
-                      Initiate Payment
-                    </button>
-                  )}
+                  {(s.from.userId === user?.id) && (() => {
+                    const hasPendingSettlement = expenses.some(exp => 
+                      exp.isSettlement && !exp.isConfirmed && !exp.isRejected &&
+                      exp.payer.id === s.from.id &&
+                      exp.splits.some(split => split.participant.id === s.to.id)
+                    );
+                    return (
+                      <button 
+                        className="btn btn-secondary btn-sm" 
+                        disabled={hasPendingSettlement}
+                        onClick={(e) => handleInitiateSettlement(s.from.id, s.to.id, s.amount, e)}
+                      >
+                        {hasPendingSettlement ? 'Payment Pending' : 'Initiate Payment'}
+                      </button>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -364,7 +438,23 @@ export default function GroupDetailPage() {
                   {p.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="member-name-group">
-                  <span className="member-name">{p.name} {p.userId && <span className="text-mint small">(Linked)</span>}</span>
+                  <span className="member-name">
+                    {p.name} {p.userId && <span className="text-mint small">(Linked)</span>}
+                    {p.userId === user?.id && (
+                      <button className="btn btn-ghost btn-xs text-mint ml-2 py-0 px-2" onClick={(e) => {
+                        const newName = prompt('Enter new name:', p.name);
+                        if (newName && newName.trim()) {
+                          const btn = e.target;
+                          btn.disabled = true;
+                          authFetch(`/participants/${p.id}`, { method: 'PUT', body: JSON.stringify({ name: newName.trim() }) })
+                            .then(() => loadAll())
+                            .catch(err => { setError(err.message); btn.disabled = false; });
+                        }
+                      }}>
+                        Edit Name
+                      </button>
+                    )}
+                  </span>
                   {!p.userId ? (
                     isLeader ? (
                       <div className="link-account-row">
@@ -374,12 +464,17 @@ export default function GroupDetailPage() {
                           id={`link-id-${p.id}`}
                           className="filter-input input-xs"
                         />
-                        <button className="btn btn-secondary btn-xs" onClick={() => {
+                        <button className="btn btn-secondary btn-xs" onClick={(e) => {
+                          const btn = e.target;
+                          btn.disabled = true;
                           const val = document.getElementById(`link-id-${p.id}`).value;
-                          if (!val) return;
-                          participantAPI.update(p.id, { email: val }).then(() => {
+                          if (!val) { btn.disabled = false; return; }
+                          authFetch(`/participants/${p.id}`, { method: 'PUT', body: JSON.stringify({ email: val }) }).then(() => {
                             loadAll();
-                          }).catch(err => setError(err.message));
+                          }).catch(err => {
+                            setError(err.message);
+                            btn.disabled = false;
+                          });
                         }}>
                           Link
                         </button>
@@ -394,7 +489,7 @@ export default function GroupDetailPage() {
                 <div className="member-actions-inline">
                   {/* Remove action: Only Leader can remove people now */}
                   {isLeader && group.participants.filter(p => p.isActive).length > 1 && (
-                    <button className="btn btn-ghost btn-sm text-red" onClick={() => handleRemoveParticipant(p.id)}>
+                    <button className="btn btn-ghost btn-sm text-red" onClick={(e) => handleRemoveParticipant(p.id, e)}>
                       Remove
                     </button>
                   )}
@@ -438,20 +533,29 @@ export default function GroupDetailPage() {
                   placeholder="username or email" 
                   className="filter-input"
                 />
-                <button className="btn btn-secondary" onClick={() => {
+                <button className="btn btn-secondary" onClick={(e) => {
+                  const btn = e.target;
+                  btn.disabled = true;
                   const nameEl = document.getElementById('new-member-name');
                   const idEl = document.getElementById('new-member-identifier');
                   const name = nameEl.value;
                   const identifier = idEl.value;
                   
-                  if (!name && !identifier) return setError('Please provide a name, username, or email');
+                  if (!name && !identifier) {
+                    setError('Please provide a name, username, or email');
+                    btn.disabled = false;
+                    return;
+                  }
                   
                   // Backend handles identifier search automatically
-                  participantAPI.add(id, { name, email: identifier }).then(() => {
+                  authFetch(`/participants/group/${id}`, { method: 'POST', body: JSON.stringify({ name, email: identifier }) }).then(() => {
                     nameEl.value = '';
                     idEl.value = '';
                     loadAll();
-                  }).catch(err => setError(err.message));
+                  }).catch(err => {
+                    setError(err.message);
+                    btn.disabled = false;
+                  });
                 }}>
                   Add to Group
                 </button>

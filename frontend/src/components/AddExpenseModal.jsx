@@ -3,7 +3,6 @@
 // ─────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
-import { expenseAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function AddExpenseModal({ group, expense, prefilledData, onClose, onSave }) {
@@ -56,11 +55,15 @@ export default function AddExpenseModal({ group, expense, prefilledData, onClose
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
     setError('');
 
-    if (!description.trim()) return setError('Description required');
-    if (!amount || parseFloat(amount) <= 0) return setError('Valid amount required');
-    if (selectedParticipants.length === 0) return setError('Select at least one participant');
+    const enableForm = () => { if (btn) btn.disabled = false; };
+
+    if (!description.trim()) { enableForm(); return setError('Description required'); }
+    if (!amount || parseFloat(amount) <= 0) { enableForm(); return setError('Valid amount required'); }
+    if (selectedParticipants.length === 0) { enableForm(); return setError('Select at least one participant'); }
 
     const totalAmount = parseFloat(amount);
 
@@ -68,7 +71,7 @@ export default function AddExpenseModal({ group, expense, prefilledData, onClose
     if (splitType === 'CUSTOM') {
       const sum = selectedParticipants.reduce((acc, pid) => acc + (parseFloat(customAmounts[pid]) || 0), 0);
       if (Math.abs(sum - totalAmount) > 0.01) {
-        return setError(`Total of custom amounts ($${sum.toFixed(2)}) must equal expense amount ($${totalAmount.toFixed(2)})`);
+        enableForm(); return setError(`Total of custom amounts ($${sum.toFixed(2)}) must equal expense amount ($${totalAmount.toFixed(2)})`);
       }
     }
 
@@ -76,7 +79,7 @@ export default function AddExpenseModal({ group, expense, prefilledData, onClose
     if (splitType === 'PERCENTAGE') {
       const sum = selectedParticipants.reduce((acc, pid) => acc + (parseFloat(percentages[pid]) || 0), 0);
       if (Math.abs(sum - 100) > 0.1) {
-        return setError(`Total percentage (${sum.toFixed(1)}%) must equal 100%`);
+        enableForm(); return setError(`Total percentage (${sum.toFixed(1)}%) must equal 100%`);
       }
     }
 
@@ -99,14 +102,26 @@ export default function AddExpenseModal({ group, expense, prefilledData, onClose
 
     setLoading(true);
     try {
-      if (isEdit) {
-        await expenseAPI.update(expense.id, body);
-      } else {
-        await expenseAPI.create(body);
-      }
+      const token = localStorage.getItem('splitmint_token');
+      const url = isEdit 
+        ? `${import.meta.env.VITE_API_BASE}/expenses/${expense.id}`
+        : `${import.meta.env.VITE_API_BASE}/expenses`;
+        
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
       onSave();
     } catch (err) {
       setError(err.message);
+      enableForm();
     } finally {
       setLoading(false);
     }

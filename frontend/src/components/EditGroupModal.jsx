@@ -3,7 +3,6 @@
 // ─────────────────────────────────────────────────────────
 
 import { useState } from 'react';
-import { groupAPI } from '../services/api';
 
 export default function EditGroupModal({ group, onClose, onSave }) {
   const [name, setName] = useState(group.name);
@@ -12,16 +11,34 @@ export default function EditGroupModal({ group, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
     setError('');
 
-    if (!name.trim()) return setError('Group name is required');
+    if (!name.trim()) {
+      setError('Group name is required');
+      if (btn) btn.disabled = false;
+      return;
+    }
 
     setLoading(true);
     try {
-      await groupAPI.update(group.id, { name });
+      const token = localStorage.getItem('splitmint_token');
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/groups/${group.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      
       onSave();
     } catch (err) {
       setError(err.message);
+      if (btn) btn.disabled = false;
     } finally {
       setLoading(false);
     }

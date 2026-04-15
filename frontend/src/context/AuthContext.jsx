@@ -3,9 +3,9 @@
 // ─────────────────────────────────────────────────────────
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -14,8 +14,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('splitmint_token');
     if (token) {
-      authAPI.profile()
-        .then(setUser)
+      fetch(`${API_BASE}/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          setUser(data);
+        })
         .catch(() => {
           localStorage.removeItem('splitmint_token');
         })
@@ -26,15 +32,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const { user, token } = await authAPI.login({ email, password });
-    localStorage.setItem('splitmint_token', token);
-    setUser(user);
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    
+    localStorage.setItem('splitmint_token', data.token);
+    setUser(data.user);
   };
 
   const signup = async (email, password, name, username) => {
-    const { user, token } = await authAPI.signup({ email, password, name, username });
-    localStorage.setItem('splitmint_token', token);
-    setUser(user);
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name, username })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
+    localStorage.setItem('splitmint_token', data.token);
+    setUser(data.user);
   };
 
   const logout = () => {
