@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3001;
 // ── Middleware ────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // ── Routes ───────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
