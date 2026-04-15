@@ -91,6 +91,10 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* New Gradients & Accents */
+  --accent-primary: var(--mint-500);
+  --accent-gradient: linear-gradient(135deg, var(--mint-400), var(--mint-600));
 }
 
 /* ── Reset & Base ──────────────────────────────────────── */

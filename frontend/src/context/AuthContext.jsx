@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -17,9 +17,9 @@ export function AuthProvider({ children }) {
       fetch(`${API_BASE}/auth/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) throw new Error(data.error);
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to fetch profile');
           setUser(data);
         })
         .catch(() => {
