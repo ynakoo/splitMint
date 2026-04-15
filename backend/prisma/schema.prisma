@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique
+  username     String        @unique
+  password     String
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  groups       Group[]       @relation("GroupCreator")
+  participants Participant[]
+}
+
+model Group {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdById  String        @db.Uuid
+  expenses     Expense[]
+  createdBy    User          @relation("GroupCreator", fields: [createdById], references: [id])
+  participants Participant[]
+
+  @@index([createdById])
+}
+
+model Participant {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String
+  color         String         @default("#6366f1")
+  avatar        String?
+  groupId       String         @db.Uuid
+  userId        String?        @db.Uuid
+  isActive      Boolean        @default(true)
+  paidExpenses  Expense[]      @relation("ExpensePayer")
+  expenseSplits ExpenseSplit[]
+  group         Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, name])
+  @@index([userId])
+}
+
+model Expense {
+  id           String         @id @default(uuid()) @db.Uuid
+  amount       Float
+  description  String
+  date         DateTime       @default(now())
+  splitType    SplitType      @default(EQUAL)
+  isSettlement Boolean        @default(false)
+  isConfirmed  Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  groupId      String         @db.Uuid
+  payerId      String         @db.Uuid
+  group        Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer        Participant    @relation("ExpensePayer", fields: [payerId], references: [id])
+  splits       ExpenseSplit[]
+
+  @@index([groupId])
+  @@index([payerId])
+}
+
+model ExpenseSplit {
+  id            String      @id @default(uuid()) @db.Uuid
+  amount        Float
+  percentage    Float?
+  expenseId     String      @db.Uuid
+  participantId String      @db.Uuid
+  expense       Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id])
+
+  @@unique([expenseId, participantId])
+  @@index([participantId])
+}
+
+enum SplitType {
+  EQUAL
+  CUSTOM
+  PERCENTAGE
+}
