@@ -57,6 +57,7 @@ model Expense {
   splitType    SplitType      @default(EQUAL)
   isSettlement Boolean        @default(false)
   isConfirmed  Boolean        @default(true)
+  isRejected   Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   groupId      String         @db.Uuid

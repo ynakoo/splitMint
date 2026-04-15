@@ -102,6 +102,15 @@ async function confirmSettlement(req, res, next) {
   }
 }
 
+async function rejectSettlement(req, res, next) {
+  try {
+    const rejected = await expenseService.rejectSettlement(req.params.id, req.user.id);
+    res.json(rejected);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /**
  * Bonus: Parse natural language into an expense object.
  * POST /api/expenses/parse
@@ -123,4 +132,4 @@ async function parseExpense(req, res, next) {
   }
 }
 
-module.exports = { createExpense, getExpenses, getExpense, updateExpense, deleteExpense, confirmSettlement, parseExpense };
+module.exports = { createExpense, getExpenses, getExpense, updateExpense, deleteExpense, confirmSettlement, rejectSettlement, parseExpense };

@@ -315,12 +315,11 @@ async function confirmSettlement(expenseId, requestingUserId) {
     where: { groupId: expense.groupId, userId: requestingUserId }
   });
 
-  // Only the person receiving the money (in the split array) OR the Group Leader can confirm
-  const isLeader = expense.group.createdById === requestingUserId;
+  // Only the person receiving the money (in the split array) can confirm
   const isReceiver = requesterParticipant && expense.splits.some((s) => s.participantId === requesterParticipant.id);
 
-  if (!isLeader && !isReceiver) {
-    const err = new Error('Only the receiver can confirm this settlement completely');
+  if (!isReceiver) {
+    const err = new Error('Only the receiver can confirm this settlement');
     err.statusCode = 403;
     throw err;
   }
@@ -337,6 +336,51 @@ async function confirmSettlement(expenseId, requestingUserId) {
   return confirmed;
 }
 
+async function rejectSettlement(expenseId, requestingUserId) {
+  const expense = await prisma.expense.findUnique({
+    where: { id: expenseId },
+    include: {
+      group: true,
+      splits: true,
+    },
+  });
+
+  if (!expense || !expense.isSettlement) {
+    const err = new Error('Settlement not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (expense.isConfirmed) {
+    const err = new Error('Settlement is already confirmed');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const requesterParticipant = await prisma.participant.findFirst({
+    where: { groupId: expense.groupId, userId: requestingUserId }
+  });
+
+  const isReceiver = requesterParticipant && expense.splits.some((s) => s.participantId === requesterParticipant.id);
+
+  if (!isReceiver) {
+    const err = new Error('Only the receiver can reject this settlement');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const rejected = await prisma.expense.update({
+    where: { id: expenseId },
+    data: { isRejected: true },
+    include: {
+      payer: true,
+      splits: { include: { participant: true } },
+    },
+  });
+
+  return rejected;
+}
+
 module.exports = {
   createExpense,
   getExpensesByGroup,
@@ -344,4 +388,5 @@ module.exports = {
   updateExpense,
   deleteExpense,
   confirmSettlement,
+  rejectSettlement,
 };

@@ -21,7 +21,10 @@ async function getDashboard(userId) {
     include: {
       participants: true,
       expenses: {
-        include: { splits: true, payer: true },
+        include: { 
+          splits: { include: { participant: true } }, 
+          payer: true 
+        },
         orderBy: { date: 'desc' },
       },
     },
@@ -57,6 +60,7 @@ async function getDashboard(userId) {
     // 2. Process expenses for general group stats and recent history
     let groupTotal = 0;
     let groupYouPaid = 0;
+    let groupTotalSpentForUser = 0;
 
     for (const expense of group.expenses) {
       groupTotal += expense.amount;
@@ -64,6 +68,28 @@ async function getDashboard(userId) {
       // Track if user was the payer for contribution stat
       if (expense.payer.userId === userId) {
         groupYouPaid += expense.amount;
+      }
+
+      // Modify global totalSpent based on user rules
+      // 1. Regular expense paid by user: UP
+      if (expense.payer.userId === userId && !expense.isSettlement) {
+        groupTotalSpentForUser += expense.amount;
+        totalSpent += expense.amount;
+      }
+
+      // 2. Settlement payment paid by user AND confirmed: UP
+      if (expense.isSettlement && expense.isConfirmed && expense.payer.userId === userId) {
+        groupTotalSpentForUser += expense.amount;
+        totalSpent += expense.amount;
+      }
+
+      // 3. Settlement payment received by user AND confirmed: DOWN
+      if (expense.isSettlement && expense.isConfirmed && expense.payer.userId !== userId) {
+        const isReceiver = expense.splits.some((s) => s.participant?.userId === userId);
+        if (isReceiver) {
+          groupTotalSpentForUser -= expense.amount;
+          totalSpent -= expense.amount;
+        }
       }
 
       // Collect recent transactions
@@ -78,13 +104,14 @@ async function getDashboard(userId) {
       });
     }
 
-    totalSpent += groupTotal;
+    // Notice we removed global totalSpent += groupTotal from here
 
     groupSummaries.push({
       groupId: group.id,
       groupName: group.name,
       totalExpenses: roundCurrency(groupTotal),
       yourContribution: roundCurrency(groupYouPaid),
+      yourTotalSpent: roundCurrency(groupTotalSpentForUser),
       participantCount: group.participants.length,
       expenseCount: group.expenses.length,
     });

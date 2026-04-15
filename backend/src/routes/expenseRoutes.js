@@ -5,7 +5,7 @@
 const router = require('express').Router();
 const {
   createExpense, getExpenses, getExpense,
-  updateExpense, deleteExpense, confirmSettlement, parseExpense,
+  updateExpense, deleteExpense, confirmSettlement, rejectSettlement, parseExpense,
 } = require('../controllers/expenseController');
 const { authenticate } = require('../middleware/auth');
 
@@ -28,6 +28,9 @@ router.put('/:id', updateExpense);
 
 // PUT    /api/expenses/:id/confirm        – Confirm a pending settlement
 router.put('/:id/confirm', confirmSettlement);
+
+// PUT    /api/expenses/:id/reject         – Reject a pending settlement
+router.put('/:id/reject', rejectSettlement);
 
 // DELETE /api/expenses/:id                – Delete expense
 router.delete('/:id', deleteExpense);
