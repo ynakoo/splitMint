@@ -44,17 +44,13 @@ The application includes a specialized balance engine to calculate who owes whom
 
 ## ⚖️ Trade-offs Considered
 
-### Real-time Updates vs. Simplicity
-- **Trade-off:** Decided against WebSockets for real-time notifications in favor of a robust RESTful API.
-- **Why:** For an expense-tracking app, data integrity and accurate calculation are more critical than sub-second real-time visibility. This reduced complexity while maintaining a high-quality user experience via standard state management.
-
 ### Greedy Settlement vs. Global Debt Simplification
-- **Trade-off:** The settlement optimizer uses a greedy approach at the group level.
-- **Why:** While global simplification across multiple groups is possible (like Splitwise's "Debt Simplification" feature), it significantly increases database complexity and privacy concerns between groups. Group-level optimization provides the best balance of simplicity and utility for the MVP.
+
+In this project, I used a greedy approach to settle debts within each group. A more advanced method could simplify debts across multiple groups (like Splitwise does), but that would make the database much more complex and could also raise privacy issues between groups. Since this is an MVP, I decided to keep it simple and focus on optimizing settlements at the group level.
 
 ### Manual vs. Automated Settlements
-- **Trade-off:** Settlements are manually recorded rather than integrated with a payment gateway.
-- **Why:** This avoids the legal and technical overhead of handling actual financial transactions, focusing purely on being a reliable "ledger."
+
+Settlements in this project are recorded manually instead of being connected to a payment gateway. Adding real payment integration would involve a lot of extra work, like handling transactions, security, and legal requirements. To keep the scope manageable, I focused on building a reliable system to track and record expenses rather than actually processing payments.
 
 ---
 
